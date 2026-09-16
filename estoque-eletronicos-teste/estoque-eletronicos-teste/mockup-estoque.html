@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  TELA DE ESTOQUE — MiauStore
+  Trabalho de SQL · front-end (HTML)
+  ----------------------------------------------------------------------------
+  COMO O SISTEMA ESTÁ ORGANIZADO (3 arquivos, 3 responsabilidades):
+
+     mockup-estoque.html  ->  ESTRUTURA: quais elementos existem na página
+     estilo.css           ->  APARÊNCIA: cores, tamanhos, layout
+     bloco de script      ->  COMPORTAMENTO: as ações (no fim deste arquivo)
+
+  E, do lado do servidor:
+     app.py               ->  back-end em Python, expõe as rotas /api/*
+     estoque.sql          ->  o banco: tabelas, restrições, view e procedures
+
+  ----------------------------------------------------------------------------
+  A IDEIA CENTRAL DA TELA
+  Tudo acontece numa TELA SÓ. A tabela lista os produtos; cada linha tem os
+  botões da própria linha (entrada, saída, editar, desativar). Como o botão
+  já está dentro da linha, o produto vem escolhido — por isso NENHUM
+  formulário precisa de uma caixa de seleção de produto.
+
+  Ao clicar numa ação, abre o PAINEL lá embaixo, que é um só e troca de
+  título e de campos conforme o caso.
+
+  ----------------------------------------------------------------------------
+  DE ONDE VÊM OS NÚMEROS
+  A tabela nasce VAZIA neste arquivo. O JavaScript busca os dados no
+  back-end (/api/produtos) e monta as linhas. O ESTOQUE não é uma coluna do
+  produto no banco: é a SOMA das entradas e saídas, calculada por uma view.
+  ============================================================================
+-->
+<!-- lang="pt-BR": informa o idioma ao navegador e ao leitor de tela
+     (muda a pronúncia e a correção ortográfica).
+     data-tema: guarda o tema atual; o JavaScript troca para "escuro" e o
+     CSS reage a essa mudança. -->
+<html lang="pt-BR" data-tema="claro">
+<head>
+<!-- charset utf-8: sem isso, os acentos (Áudio, Acessório) viram símbolos. -->
+<meta charset="utf-8">
+<!-- viewport: faz o celular usar a largura real da tela em vez de fingir
+     ser um desktop e encolher tudo. É o que permite o layout responsivo. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estoque MiauStore</title>
+
+<!-- FONTES (Google Fonts)
+     preconnect: adianta a conexão com o servidor das fontes, para elas
+     chegarem mais rápido. Fraunces = títulos; IBM Plex Sans = texto;
+     IBM Plex Mono = números (alinha as colunas de preço e estoque). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- FOLHA DE ESTILO
+     Toda a aparência da página está em estilo.css, num arquivo separado.
+     Isso mantém este HTML focado só na ESTRUTURA do conteúdo. -->
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<!-- .wrap: container que centraliza o conteúdo e limita a largura máxima,
+     para as linhas de texto não ficarem largas demais em telas grandes. -->
+<div class="wrap">
+
+<!-- ==========================================================================
+     CABEÇALHO — identidade da loja + controles de acessibilidade
+     ========================================================================== -->
+<header>
+  <div class="marca">
+    <div>
+      <!-- alt: descreve a imagem para quem usa leitor de tela e aparece
+           caso a imagem não carregue. Toda imagem informativa precisa. -->
+      <img src="imagens/iconeDaLoja.png" alt="Logo da MiauStore">
+    </div>
+    <div>
+      <h1>MiauStore-Estoque de eletrônicos</h1>
+      <p>
+        Trabalho de SQL
+      </p>
+    </div>
+  </div>
+
+  <!-- CONTROLES DE ACESSIBILIDADE
+       role="group" + aria-label: apresentam estes botões como um conjunto
+       com nome, em vez de botões soltos sem contexto.
+       Funcionam só no navegador — não têm nada a ver com o banco. -->
+  <div class="acessibilidade" role="group" aria-label="Acessibilidade">
+    <span class="rotulo">Tamanho do texto</span>
+    <div class="grupo">
+      <!-- aria-label: o texto visível é "A−", curto demais para descrever a
+           ação; o aria-label é o que o leitor de tela realmente anuncia. -->
+      <button id="fonte-menor" aria-label="Diminuir tamanho do texto">A−</button>
+      <button id="fonte-maior" aria-label="Aumentar tamanho do texto">A+</button>
+    </div>
+    <div class="grupo">
+      <!-- aria-pressed: marca um botão de liga/desliga. O JavaScript alterna
+           entre "false" e "true", e o CSS usa isso para pintar o botão. -->
+      <button id="btn-tema" aria-pressed="false">☾ Modo escuro</button>
+    </div>
+  </div>
+</header>
+
+<!-- ==========================================================================
+     BARRA DE FERRAMENTAS — busca e criação
+     ========================================================================== -->
+<div class="toolbar">
+  <div class="grow">
+    <!-- type="search" dá o comportamento de busca (inclusive o "x" de limpar).
+         A filtragem acontece na lista JÁ CARREGADA, no navegador: é instantânea
+         e não gera uma consulta nova ao banco a cada tecla digitada. -->
+    <input id="busca" type="search" placeholder="Buscar produto pelo nome" aria-label="Buscar produto pelo nome">
+  </div>
+  <button class="primary" id="btn-novo">+ Novo produto</button>
+</div>
+
+<!-- ==========================================================================
+     TABELA DE PRODUTOS — o centro da tela
+     ========================================================================== -->
+<div class="panel-table">
+  <!-- .tabela-rolagem: caixa de rolagem HORIZONTAL só para a tabela.
+       POR QUE ELA EXISTE: o .panel-table tem `overflow:hidden` para que o
+       conteúdo respeite os cantos arredondados. O efeito colateral era que,
+       quando a tela encolhia e a tabela ficava mais larga que o espaço
+       disponível, o excesso era CORTADO — os botões de ação sumiam pela
+       direita, sem nenhuma forma de alcançá-los.
+       Com esta caixa, o excesso vira ROLAGEM em vez de corte. Ela é a rede de
+       segurança: só aparece quando a tabela realmente não cabe (inclusive
+       quando o usuário aumenta o texto no A+, que alarga tudo). -->
+  <div class="tabela-rolagem">
+  <table>
+    <thead>
+      <tr>
+        <!-- As larguras em % mantêm as colunas estáveis mesmo quando os
+             textos mudam de tamanho (senão a tabela "dança" a cada busca).
+             A classe "r" alinha os números à direita, como se faz em
+             qualquer planilha: facilita comparar valores na vertical. -->
+        <th style="width:30%">Produto</th>
+        <th style="width:14%">Categoria</th>
+        <th style="width:12%">Marca</th>
+        <th class="r" style="width:12%">Preço venda</th>
+        <th class="r" style="width:9%">Estoque</th>
+        <th class="r" style="width:7%">Mínimo</th>
+        <th class="r" style="width:16%">Ações</th>
+      </tr>
+    </thead>
+
+    <!-- CORPO VAZIO DE PROPÓSITO.
+         O JavaScript preenche este <tbody> com os dados vindos de
+         /api/produtos. Se você abrir este arquivo direto (clique duplo, sem
+         o servidor Python), a tabela aparece vazia — é o esperado. -->
+    <tbody id="corpo"></tbody>
+  </table>
+  </div><!-- /.tabela-rolagem -->
+
+  <!-- RODAPÉ COM OS TOTAIS
+       É a CONSULTA 2 do trabalho ("quanto de dinheiro está parado na
+       prateleira?") aparecendo na tela, sem precisar de outra página.
+       O &nbsp; é um espaço invisível que segura a altura da linha até o
+       JavaScript preencher os valores. -->
+  <div class="totais">
+    <span id="t-produtos">&nbsp;</span>
+    <span id="t-valor">&nbsp;</span>
+  </div>
+</div>
+
+<!-- LEGENDA DE CORES
+     Sem ela, as pílulas coloridas seriam só enfeite. Com ela, a cor vira
+     informação que o leitor consegue interpretar. -->
+<div class="legenda" aria-label="Legenda de cores">
+  <span class="titulo-legenda">Legenda</span>
+  <span class="item"><span class="ponto azul"></span>Celular</span>
+  <span class="item"><span class="ponto azulclaro"></span>Áudio</span>
+  <span class="item"><span class="ponto rosa"></span>Acessório</span>
+  <span class="item"><span class="ponto verde"></span>Notebook</span>
+  <span class="item"><span class="ponto alerta"></span>Estoque abaixo do mínimo</span>
+</div>
+
+<!-- Aviso que ocupa o lugar do painel enquanto nenhum formulário está aberto.
+     Evita que a página "pule" quando o painel aparece e some. -->
+<div class="vazio" id="vazio">Clique em uma ação da tabela para abrir o formulário aqui embaixo.</div>
+
+<!-- ==========================================================================
+     PAINEL DE FORMULÁRIO — um só para todas as ações
+     --------------------------------------------------------------------------
+     Este painel serve às CINCO ações: novo produto, editar, registrar entrada,
+     registrar saída e desativar. O JavaScript troca o título (#painel-titulo)
+     e os campos (#painel-corpo) conforme o botão clicado.
+
+     Por que um painel só, e não cinco?
+     Menos código repetido e um comportamento único para aprender. Também
+     evita uma janela flutuante (modal), que exigiria fundo escurecido,
+     z-index e controle de foco.
+
+     hidden: começa escondido; o JavaScript liga e desliga esse atributo.
+     aria-live="polite": avisa o leitor de tela quando o conteúdo aqui muda,
+     porque a mudança acontece sem recarregar a página — sem isso, quem não
+     enxerga não saberia que um formulário abriu.
+     ========================================================================== -->
+<section class="painel" id="painel" hidden aria-live="polite">
+  <div class="painel-topo">
+    <!-- Preenchidos pelo JavaScript: "Novo produto", "Registrar saída"... -->
+    <h2 id="painel-titulo"></h2>
+    <button id="btn-fechar" aria-label="Fechar formulário">&times;</button>
+  </div>
+
+  <!-- Aqui entram os campos, montados pelo JavaScript conforme a ação. -->
+  <div id="painel-corpo"></div>
+
+  <!-- MENSAGEM DE ERRO
+       Mostra o que o BANCO respondeu. Ex.: ao tentar tirar mais do que há
+       em estoque, a procedure do SQL Server dispara um erro e o texto
+       "Saldo insuficiente para a saída solicitada." aparece aqui.
+       Ou seja: a regra de negócio mora no banco, não nesta tela. -->
+  <p class="erro" id="erro" hidden></p>
+
+  <div class="rodape-painel">
+    <button id="btn-cancelar">Cancelar</button>
+    <!-- O texto deste botão muda conforme a ação ("Salvar produto",
+         "Confirmar saída"...) — dizer o que vai acontecer é mais claro
+         do que um "OK" genérico. -->
+    <button class="primary" id="btn-confirmar"></button>
+  </div>
+</section>
+
+<p class="nota">
+  Os dados são lidos e gravados no SQL Server através do back-end em Python (rotas /api).
+</p>
+
+</div>
+
+<script>
+  
+// ---------------------------------------------------------------------------
+// ESTADO — preenchido pelo back-end
+// Estas listas começam vazias e são carregadas do servidor (rotas /api/*).
+// O saldo NÃO é uma coluna do produto: vem da view que soma as movimentações.
+// ---------------------------------------------------------------------------
+let produtos     = [];   // vem de /api/produtos (já com o estoque_atual da view)
+let categorias   = [];   // {id, nome} — /api/categorias
+let marcas       = [];   // {id, nome} — /api/marcas
+let fornecedores = [];   // {id, nome} — /api/fornecedores
+
+// Motivos são fixos (a lista fechada que justifica o CHECK no banco). A tela
+// mostra o rótulo bonito; o back-end converte para o código (COMPRA, VENDA...).
+const motivosEntrada = ["Compra", "Devolução de cliente", "Ajuste de inventário"];
+const motivosSaida   = ["Venda", "Perda", "Ajuste de inventário"];
+
+// Mapeia cada categoria a uma cor da pílula (mesma paleta usada na legenda).
+const corPorCategoria = { Celular:"azul", Áudio:"azulclaro", Acessório:"rosa", Notebook:"verde" };
+
+const brl = v => Number(v).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+
+// <option> de texto simples (usado nos motivos).
+const opcoes = (lista, sel) => lista.map(o => `<option${o===sel?" selected":""}>${o}</option>`).join("");
+// <option> de item com id: value = id, texto = nome, marcado pelo id selecionado.
+// É assim que a tela mostra o NOME e envia o ID (imune a acento/maiúscula).
+const opcoesId = (lista, selId) =>
+  lista.map(o => `<option value="${o.id}"${o.id===selId?" selected":""}>${o.nome}</option>`).join("");
+
+// ---------------------------------------------------------------------------
+// PONTE COM O BACK-END
+// Um helper só para todas as chamadas. Toda resposta é {ok:true,...} ou
+// {ok:false, erro:"..."}; quando não for ok, lança o erro para quem chamou
+// mostrar a mensagem (ex.: "Saldo insuficiente...") no painel.
+// ---------------------------------------------------------------------------
+async function api(rota, metodo = "GET", corpo = null) {
+  const opcoesReq = { method: metodo, headers: { "Content-Type": "application/json" } };
+  if (corpo) opcoesReq.body = JSON.stringify(corpo);
+  const resposta = await fetch(rota, opcoesReq);
+  const json = await resposta.json();
+  if (!json.ok) throw new Error(json.erro || "Erro ao falar com o servidor.");
+  return json;
+}
+
+// Carrega tudo do servidor (produtos + listas auxiliares) e redesenha a tabela.
+// As quatro chamadas vão em paralelo (Promise.all) para a tela abrir rápido.
+async function carregarDados() {
+  try {
+    const [pRes, cRes, mRes, fRes] = await Promise.all([
+      api("/api/produtos"), api("/api/categorias"),
+      api("/api/marcas"),   api("/api/fornecedores"),
+    ]);
+    // A view devolve nomes de coluna próprios (produto_id, produto, ...).
+    // Traduzo para os campos curtos que o resto da tela já usa.
+    produtos = pRes.dados.map(r => ({
+      id:           r.produto_id,
+      nome:         r.produto,
+      categoria_id: r.categoria_id,
+      categoria:    r.categoria,
+      marca_id:     r.marca_id,
+      marca:        r.marca,
+      custo:        Number(r.preco_custo),
+      venda:        Number(r.preco_venda),
+      saldo:        r.estoque_atual,   // <- veio da SOMA das movimentações
+      minimo:       r.estoque_minimo,
+    }));
+    categorias   = cRes.dados;
+    marcas       = mRes.dados;
+    fornecedores = fRes.dados;
+    renderTabela();
+  } catch (e) {
+    document.getElementById("corpo").innerHTML =
+      `<tr><td colspan="7" class="sub" style="padding:1.5rem .9rem">Não foi possível carregar do servidor: ${e.message}</td></tr>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TABELA
+// ---------------------------------------------------------------------------
+function renderTabela() {
+  const termo = document.getElementById("busca").value.trim().toLowerCase();
+  const lista = produtos.filter(p => p.nome.toLowerCase().includes(termo));
+
+  document.getElementById("corpo").innerHTML = lista.map(p => {
+    const baixo = p.saldo < p.minimo;
+    const cor = corPorCategoria[p.categoria] || "azul";
+    return `
+      <tr class="${baixo ? "baixo" : ""}">
+        <td>${p.nome}${baixo ? '<span class="flag">abaixo do mínimo</span>' : ""}</td>
+        <td data-label="Categoria"><span class="chip chip-${cor}">${p.categoria}</span></td>
+        <td data-label="Marca" class="sub">${p.marca}</td>
+        <td data-label="Preço venda" class="r num">${brl(p.venda)}</td>
+        <td data-label="Estoque" class="r num saldo">${p.saldo}</td>
+        <td data-label="Mínimo" class="r num sub">${p.minimo}</td>
+        <td class="acoes" data-label="Ações">
+          <button data-acao="entrada"  data-id="${p.id}" title="Registrar entrada" aria-label="Registrar entrada de ${p.nome}">&darr; Entrada</button>
+          <button data-acao="saida"    data-id="${p.id}" title="Registrar saída"   aria-label="Registrar saída de ${p.nome}">&uarr; Saída</button>
+          <button data-acao="editar"   data-id="${p.id}" title="Editar"            aria-label="Editar ${p.nome}">Editar</button>
+          <button data-acao="desativar" class="dan" data-id="${p.id}" title="Desativar" aria-label="Desativar ${p.nome}">Desativar</button>
+        </td>
+      </tr>`;
+  }).join("") || `<tr><td colspan="7" class="sub" style="padding:1.5rem .9rem">Nenhum produto encontrado.</td></tr>`;
+
+  const valor = produtos.reduce((s, p) => s + p.saldo * p.custo, 0);
+  document.getElementById("t-produtos").innerHTML =
+    `<strong>${produtos.length}</strong> produtos ativos &middot; <strong>${produtos.filter(p=>p.saldo<p.minimo).length}</strong> abaixo do mínimo`;
+  document.getElementById("t-valor").innerHTML =
+    `Valor imobilizado em estoque: <strong class="num">${brl(valor)}</strong>`;
+}
+
+const painel   = document.getElementById("painel");
+const vazio    = document.getElementById("vazio");
+const titulo   = document.getElementById("painel-titulo");
+const corpo    = document.getElementById("painel-corpo");
+const erro     = document.getElementById("erro");
+const confirmar= document.getElementById("btn-confirmar");
+let estado = null;
+
+function formProduto(p) {
+  return `
+    <div class="grid">
+      <div>
+        <label for="f-nome">Nome</label>
+        <input id="f-nome" type="text" value="${p ? p.nome : ""}" placeholder="Notebook Dell Inspiron 15">
+        <p class="dica">Precisa ser único — é o nome que identifica o produto.</p>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div><label for="f-cat">Categoria</label><select id="f-cat">${opcoesId(categorias, p ? p.categoria_id : null)}</select></div>
+      <div><label for="f-marca">Marca</label><select id="f-marca">${opcoesId(marcas, p ? p.marca_id : null)}</select></div>
+    </div>
+    <div class="grid g3">
+      <div><label for="f-custo">Preço de custo</label><input id="f-custo" type="number" step="0.01" value="${p ? p.custo : ""}" placeholder="2800,00"></div>
+      <div><label for="f-venda">Preço de venda</label><input id="f-venda" type="number" step="0.01" value="${p ? p.venda : ""}" placeholder="3499,00"></div>
+      <div><label for="f-min">Estoque mínimo</label><input id="f-min" type="number" value="${p ? p.minimo : ""}" placeholder="5"></div>
+    </div>
+    <p class="dica">Não existe campo de quantidade inicial: o estoque nasce em zero e sobe com a primeira entrada.</p>`;
+}
+
+function formMovimentacao(p, tipo) {
+  const motivos = tipo === "entrada" ? motivosEntrada : motivosSaida;
+  return `
+    <div class="contexto">
+      ${p.nome} &middot; estoque atual <strong class="num">${p.saldo}</strong>
+    </div>
+    <div class="grid g2">
+      <div><label for="f-qtd">Quantidade</label><input id="f-qtd" type="number" min="1" value="1"></div>
+      <div><label for="f-motivo">Motivo</label><select id="f-motivo">${opcoes(motivos)}</select></div>
+    </div>
+    <div class="grid" id="bloco-forn" ${tipo === "entrada" ? "" : "hidden"}>
+      <div>
+        <label for="f-forn">Fornecedor</label>
+        <select id="f-forn">${opcoesId(fornecedores)}</select>
+        <p class="dica">Obrigatório apenas quando o motivo é compra.</p>
+      </div>
+    </div>`;
+}
+
+function abrir(acao, id) {
+  const p = produtos.find(x => x.id === id);
+  estado = { acao, id };
+  erro.hidden = true;
+
+  if (acao === "novo")       { titulo.textContent = "Novo produto";        corpo.innerHTML = formProduto(null); confirmar.textContent = "Salvar produto"; }
+  if (acao === "editar")     { titulo.textContent = "Editar produto";      corpo.innerHTML = formProduto(p);    confirmar.textContent = "Salvar alterações"; }
+  if (acao === "entrada")    { titulo.textContent = "Registrar entrada";   corpo.innerHTML = formMovimentacao(p, "entrada"); confirmar.textContent = "Confirmar entrada"; }
+  if (acao === "saida")      { titulo.textContent = "Registrar saída";     corpo.innerHTML = formMovimentacao(p, "saida");   confirmar.textContent = "Confirmar saída"; }
+  if (acao === "desativar")  {
+    titulo.textContent = "Desativar produto";
+    corpo.innerHTML = `<div class="contexto">${p.nome}</div>
+      <p class="dica">O produto sai da lista mas continua no banco. O histórico de movimentações é preservado — por isso desativamos em vez de excluir.</p>`;
+    confirmar.textContent = "Desativar";
+  }
+
+  // Fornecedor só aparece quando o motivo da entrada é compra.
+  const motivo = document.getElementById("f-motivo");
+  if (motivo && acao === "entrada") {
+    motivo.addEventListener("change", () => {
+      document.getElementById("bloco-forn").hidden = motivo.value !== "Compra";
+    });
+  }
+
+  painel.style.animation = "none";
+  painel.offsetHeight;
+  painel.style.animation = "";
+
+  painel.hidden = false;
+  vazio.hidden = true;
+  painel.scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+
+function fechar() {
+  painel.hidden = true;
+  vazio.hidden = false;
+  estado = null;
+}
+
+// ---------------------------------------------------------------------------
+// AÇÕES — cada confirmação chama a rota certa do back-end.
+// ---------------------------------------------------------------------------
+
+// Mostra uma mensagem de erro no painel, com o "balançar" de destaque.
+function mostrarErro(msg) {
+  erro.textContent = msg;
+  erro.style.animation = "none";
+  erro.offsetHeight;          // força o navegador a reiniciar a animação
+  erro.style.animation = "";
+  erro.hidden = false;
+}
+
+confirmar.addEventListener("click", async () => {
+  const nomeEl = document.getElementById("f-nome");
+  const qtdEl  = document.getElementById("f-qtd");
+
+  // Validações de tela (o banco valida de novo do lado dele, é a fonte da verdade).
+  if (nomeEl && !nomeEl.value.trim())  return mostrarErro("Informe o nome do produto.");
+  if (qtdEl && (!qtdEl.value || Number(qtdEl.value) < 1))
+    return mostrarErro("A quantidade precisa ser maior que zero.");
+
+  confirmar.disabled = true;   // evita clique duplo enquanto a requisição está no ar
+  try {
+    if (estado.acao === "novo" || estado.acao === "editar") {
+      // Cadastro do produto — sem quantidade: estoque nasce em zero.
+      const dados = {
+        nome:           nomeEl.value.trim(),
+        categoria_id:   Number(document.getElementById("f-cat").value),
+        marca_id:       Number(document.getElementById("f-marca").value),
+        preco_custo:    Number(document.getElementById("f-custo").value) || 0,
+        preco_venda:    Number(document.getElementById("f-venda").value) || 0,
+        estoque_minimo: Number(document.getElementById("f-min").value)   || 0,
+      };
+      if (estado.acao === "novo") {
+        await api("/api/produtos", "POST", dados);           // -> sp_produto_cadastrar
+      } else {
+        dados.produto_id = estado.id;
+        await api("/api/produtos/editar", "POST", dados);    // -> sp_produto_editar
+      }
+    }
+    else if (estado.acao === "entrada") {
+      const motivo = document.getElementById("f-motivo").value;
+      // Fornecedor só quando o motivo é compra — a mesma regra do CHECK do banco.
+      const fornecedor_id = motivo === "Compra"
+        ? Number(document.getElementById("f-forn").value) : null;
+      await api("/api/entradas", "POST", {                   // -> sp_movimentacao_entrada
+        produto_id: estado.id,
+        quantidade: Number(qtdEl.value),
+        motivo,
+        fornecedor_id,
+      });
+    }
+    else if (estado.acao === "saida") {
+      // O back valida o saldo na procedure; se faltar, o erro cai no catch.
+      await api("/api/saidas", "POST", {                     // -> sp_movimentacao_saida
+        produto_id: estado.id,
+        quantidade: Number(qtdEl.value),
+        motivo: document.getElementById("f-motivo").value,
+      });
+    }
+    else if (estado.acao === "desativar") {
+      await api("/api/produtos/desativar", "POST", { produto_id: estado.id }); // ativo = 0
+    }
+
+    // Deu certo: recarrega do servidor e fecha. A tabela muda na hora —
+    // o número novo aparece na frente do professor.
+    await carregarDados();
+    fechar();
+  } catch (e) {
+    // Erro de regra do banco (saldo insuficiente, nome duplicado, CHECK...).
+    mostrarErro(e.message);
+  } finally {
+    confirmar.disabled = false;
+  }
+});
+
+document.getElementById("corpo").addEventListener("click", e => {
+  const b = e.target.closest("button[data-acao]");
+  if (b) abrir(b.dataset.acao, Number(b.dataset.id));
+});
+document.getElementById("btn-novo").addEventListener("click", () => abrir("novo", null));
+document.getElementById("btn-fechar").addEventListener("click", fechar);
+document.getElementById("btn-cancelar").addEventListener("click", fechar);
+document.getElementById("busca").addEventListener("input", renderTabela);
+
+// Primeira carga: busca tudo do servidor e desenha a tela.
+carregarDados();
+
+const tamanhos = [14, 16, 18, 20];
+let indiceTamanho = 0;
+const btnFonteMenor = document.getElementById("fonte-menor");
+const btnFonteMaior = document.getElementById("fonte-maior");
+
+function aplicarTamanho() {
+  document.documentElement.style.fontSize = tamanhos[indiceTamanho] + "px";
+  btnFonteMenor.disabled = indiceTamanho === 0;
+  btnFonteMaior.disabled = indiceTamanho === tamanhos.length - 1;
+}
+btnFonteMaior.addEventListener("click", () => {
+  if (indiceTamanho < tamanhos.length - 1) { indiceTamanho++; aplicarTamanho(); }
+});
+btnFonteMenor.addEventListener("click", () => {
+  if (indiceTamanho > 0) { indiceTamanho--; aplicarTamanho(); }
+});
+aplicarTamanho();
+
+const btnTema = document.getElementById("btn-tema");
+let escuro = false;
+btnTema.addEventListener("click", () => {
+  escuro = !escuro;
+  document.documentElement.setAttribute("data-tema", escuro ? "escuro" : "claro");
+  btnTema.setAttribute("aria-pressed", String(escuro));
+  btnTema.textContent = escuro ? "☀ Modo claro" : "☾ Modo escuro";
+});
+</script>
+</body>
+</html>

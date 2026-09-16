@@ -1,0 +1,636 @@
+/* ==========================================================================
+   ESTILO.CSS — Aparência da tela de estoque (MiauStore)
+   Trabalho de SQL · front-end
+   --------------------------------------------------------------------------
+   POR QUE O CSS ESTÁ NUM ARQUIVO SEPARADO?
+   Separar conteúdo (HTML) de aparência (CSS) é a "separação de
+   responsabilidades". Ganhos concretos:
+     - O HTML fica curto e legível: dá para entender a estrutura da página
+       sem rolar por 300 linhas de estilo.
+     - O navegador guarda o CSS em cache: ele é baixado uma vez só, mesmo que
+       a página recarregue várias vezes.
+     - Se um dia existir uma segunda tela, ela reaproveita este mesmo arquivo.
+
+   ÍNDICE (use Ctrl+F para pular para uma seção)
+     1. VARIÁVEIS DE COR ......... a paleta, definida uma vez só
+     2. TEMA ESCURO .............. as mesmas variáveis, com outros valores
+     3. BASE ..................... reset e tipografia geral
+     4. CABEÇALHO ................ logo, título e acessibilidade
+     5. BUSCA E BOTÕES ........... a barra de ferramentas
+     6. TABELA ................... a lista de produtos
+     7. PÍLULAS E LEGENDA ........ as cores por categoria
+     8. PAINEL DE FORMULÁRIO ..... o painel que abre embaixo
+     9. ANIMAÇÕES ................ os movimentos da interface
+    10. RESPONSIVO ............... os tres degraus: aperta, vira cartao, vira celular
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. VARIÁVEIS DE COR
+   --------------------------------------------------------------------------
+   `:root` é o elemento <html>. Tudo que for declarado aqui vale para a página
+   inteira. Estas linhas com `--` são VARIÁVEIS CSS (custom properties).
+
+   POR QUE USAR VARIÁVEIS EM VEZ DE ESCREVER A COR EM CADA LUGAR?
+   Porque a cor de destaque aparece em dezenas de regras (botões, links,
+   bordas, foco...). Com variável, trocar o tema inteiro é mudar UMA linha.
+   É a mesma ideia da normalização do banco: não repetir o mesmo dado.
+
+   Como usar: `color: var(--ink);`
+   ========================================================================== */
+:root{
+  /* --- cores de superfície e texto --- */
+  --page:#f8f6fa;      /* fundo da página */
+  --surface:#ffffff;   /* fundo dos "cartões": tabela, painel */
+  --ink:#241f33;       /* texto principal */
+  --muted:#665f7a;     /* texto secundário (rótulos) */
+  --faint:#9a92ac;     /* texto de apoio (dicas), o mais claro */
+  --line:#e7e1ee;      /* bordas e divisórias */
+
+  /* --- paleta de identidade ---
+     Cada cor tem um par: a cor forte (texto/ícone) e a "-soft" (fundo).
+     Esse par é o que faz as pílulas de categoria ficarem legíveis. */
+  --azul:#567599;
+  --azul-soft:#e6eef8;
+  --azulclaro:#227885;
+  --azulclaro-soft:#e1f2f3;
+  --rosa:#a94f6c;
+  --rosa-soft:#fbebf0;
+  --terracota:#b8462f;
+  --terracota-soft:#f8e9e5;
+  --verde:#5f7d46;
+  --verde-soft:#eef3e6;
+  --lavanda:#665a96;
+  --lavanda-soft:#eeecf7;
+
+  /* --- papéis semânticos ---
+     Em vez de usar "--azul" direto nos botões, criamos um APELIDO que diz a
+     FUNÇÃO da cor. Assim, trocar a cor de destaque do sistema inteiro é
+     mudar só esta linha, sem caçar "azul" no arquivo todo. */
+  --accent:var(--azul);              /* cor de destaque: botões, foco */
+  --accent-soft:var(--azul-soft);
+  --alert:var(--terracota);          /* cor de alerta: erro, estoque baixo */
+  --alert-soft:var(--terracota-soft);
+
+  /* --- medidas reaproveitadas --- */
+  --radius:14px;      /* cantos arredondados dos cartões grandes */
+  --radius-sm:9px;    /* cantos dos campos e botões pequenos */
+  --pill:999px;       /* valor alto = formato de cápsula (pílula) */
+  --shadow:0 1px 2px rgba(36,31,51,.04), 0 10px 24px -16px rgba(36,31,51,.22);
+}
+
+
+/* ==========================================================================
+   2. TEMA ESCURO
+   --------------------------------------------------------------------------
+   O botão "Modo escuro" (no JavaScript) escreve data-tema="escuro" na tag
+   <html>. Este seletor casa com isso e REDEFINE as mesmas variáveis da
+   seção 1 com valores escuros.
+
+   O truque: nenhuma outra regra do arquivo precisa saber que existe tema
+   escuro. Todas elas usam var(--ink), var(--surface)... e simplesmente
+   passam a receber outro valor. Um atributo muda, a página inteira muda.
+   ========================================================================== */
+html[data-tema="escuro"]{
+  --page:#1c1826;
+  --surface:#252032;
+  --ink:#f1eef7;
+  --muted:#908c9c;
+  --faint:#867d99;
+  --line:#39324a;
+
+  /* As cores de identidade ficam mais claras para manter o contraste
+     legível sobre o fundo escuro. */
+  --azul:#7ea0c7;
+  --azul-soft:#2a3648;
+  --azulclaro:#7fd2db;
+  --azulclaro-soft:#1e363a;
+  --rosa:#e6a3bc;
+  --rosa-soft:#3a2530;
+  --terracota:#ba2c46;
+  --terracota-soft:rgba(66, 37, 51, 0.712);
+  --verde:#a7c187;
+  --verde-soft:#2b3322;
+  --lavanda:#b7ace0;
+  --lavanda-soft:#2c2740;
+
+  --shadow:0 1px 2px rgba(0,0,0,.2), 0 10px 24px -16px rgba(0,0,0,.5);
+}
+
+
+/* ==========================================================================
+   3. BASE — reset e tipografia
+   ========================================================================== */
+
+/* `border-box` faz padding e borda entrarem DENTRO da largura declarada.
+   Sem isso, um elemento com width:100% e padding estoura o container.
+   O `*` aplica a regra a todos os elementos. */
+*{box-sizing:border-box}
+
+/* Tamanho base da fonte. O JavaScript dos botões A+/A− altera este valor.
+   Como o resto do arquivo mede em `rem` (múltiplos deste tamanho), mudar
+   aqui aumenta a interface INTEIRA de forma proporcional. */
+html{font-size:14px}
+
+body{
+  margin:0;                       /* tira a margem padrão do navegador */
+  background:var(--page);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:1rem;
+  line-height:1.6;                /* respiro entre linhas: melhora a leitura */
+  -webkit-font-smoothing:antialiased;
+  transition:background .2s ease, color .2s ease;  /* suaviza a troca de tema */
+}
+
+/* Fonte monoespaçada para NÚMEROS.
+   `tabular-nums` faz todo dígito ocupar a mesma largura, então os valores
+   da coluna de preço/estoque ficam alinhados verticalmente. */
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* Container central: limita a largura e centraliza com margin auto.
+   Sem o max-width, em telas largas as linhas ficariam longas demais. */
+.wrap{max-width:1080px;margin:0 auto;padding:2.4rem 1.4rem 4rem}
+
+
+/* ==========================================================================
+   4. CABEÇALHO — logo, título e controles de acessibilidade
+   ========================================================================== */
+header{
+  display:flex;                   /* logo à esquerda, acessibilidade à direita */
+  align-items:flex-end;
+  justify-content:space-between;  /* empurra os dois blocos para as pontas */
+  gap:1rem;
+  flex-wrap:wrap;                 /* em tela estreita, quebra em duas linhas */
+  padding-bottom:1.1rem;margin-bottom:1.3rem;border-bottom:1px solid var(--line);
+}
+.marca{display:flex;align-items:center;gap:.7rem}
+.marca img{
+  width:2.6rem;height:2.6rem;
+  object-fit:contain;             /* encaixa a logo sem distorcer a proporção */
+  border-radius:var(--radius-sm);
+  flex-shrink:0;                  /* impede que a logo seja espremida */
+}
+header h1{margin:0;font-family:"Fraunces",serif;font-weight:600;font-size:1.6rem;letter-spacing:-.01em}
+header p{margin:.15rem 0 0;color:var(--muted);font-size:.85rem}
+
+/* --- controles de acessibilidade (tamanho do texto e tema) --- */
+.acessibilidade{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding-bottom:.2rem}
+
+/* Agrupa botões dentro de uma "cápsula", indicando que são uma unidade. */
+.acessibilidade .grupo{
+  display:flex;align-items:center;gap:2px;border:1px solid var(--line);
+  border-radius:var(--pill);padding:2px;background:var(--surface);
+}
+.acessibilidade button{
+  border:none;background:transparent;color:var(--muted);
+  padding:.35rem .7rem;border-radius:var(--pill);font-size:.8rem;cursor:pointer;
+  transition:background .15s ease, color .15s ease;
+}
+.acessibilidade button:hover{background:var(--accent-soft);color:var(--accent)}
+
+/* Botão desabilitado (ex.: A− já no menor tamanho): apagado e sem cursor
+   de clique, comunicando que ali não há ação disponível. */
+.acessibilidade button:disabled{opacity:.35;cursor:default;background:none;color:var(--muted)}
+
+/* aria-pressed="true" marca um botão de liga/desliga que está LIGADO.
+   Estilizar por esse atributo mantém visual e acessibilidade em sincronia:
+   o leitor de tela e o olho recebem a mesma informação. */
+.acessibilidade button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.acessibilidade .rotulo{font-size:.72rem;color:var(--faint)}
+
+
+/* ==========================================================================
+   5. BUSCA E BOTÕES
+   ========================================================================== */
+.toolbar{display:flex;gap:.7rem;align-items:center;margin:0 0 1.1rem;flex-wrap:wrap}
+
+/* `flex:1` faz o campo de busca esticar e ocupar todo o espaço que sobrar,
+   empurrando o botão "Novo produto" para a direita. */
+.toolbar .grow{flex:1;min-width:200px;position:relative}
+
+/* Ícone de lupa desenhado com ::before, sem precisar de imagem nem biblioteca.
+   `pointer-events:none` faz o clique atravessar o ícone e chegar no campo. */
+.toolbar .grow::before{
+  content:"⌕";position:absolute;left:.8rem;top:50%;transform:translateY(-50%);
+  color:var(--faint);font-size:1rem;pointer-events:none;
+}
+
+input,select{
+  font:inherit;                   /* herda a fonte do body; sem isso o
+                                     navegador usa uma fonte própria e feia */
+  width:100%;padding:.68rem .8rem;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.toolbar .grow input{padding-left:2.3rem}  /* abre espaço para a lupa */
+input:hover,select:hover{border-color:var(--faint)}
+
+/* ACESSIBILIDADE: contorno visível ao navegar por TECLADO (tecla Tab).
+   `:focus-visible` (em vez de `:focus`) mostra o contorno só para quem usa
+   teclado, sem poluir a tela de quem clica com o mouse.
+   Nunca remova isso: sem contorno, o teclado fica impossível de usar. */
+input:focus-visible,select:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+
+button{
+  font:inherit;cursor:pointer;border-radius:var(--pill);
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:.62rem 1.1rem;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+button:hover{border-color:var(--faint)}
+
+/* Botão da ação PRINCIPAL de cada contexto (salvar, confirmar, novo).
+   Só um por área: é o que guia o olho para o próximo passo. */
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+button.primary:hover{background:var(--azul);filter:brightness(0.92)}
+
+
+/* ==========================================================================
+   6. TABELA — a lista de produtos
+   ========================================================================== */
+
+/* O `overflow:hidden` faz o conteúdo respeitar os cantos arredondados:
+   sem ele, o cabeçalho da tabela vazaria para fora da curva da borda. */
+.panel-table{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+}
+
+/* --- CAIXA DE ROLAGEM DA TABELA (a rede de segurança) ---
+   O `overflow:hidden` do .panel-table arredonda os cantos, mas CORTA tudo o
+   que passar da borda. Numa tela estreita a tabela fica mais larga que o
+   espaço disponível e os botões de ação eram simplesmente cortados.
+
+   `overflow-x:auto` resolve: quando não cabe, aparece uma barra de rolagem
+   horizontal e o conteúdo continua alcançável. Quando cabe, nada muda —
+   a barra nem aparece.
+
+   Isto também cobre o caso do botão A+ (aumentar texto): ao subir a fonte
+   para 20px a tabela inteira cresce junto e pode não caber nem no desktop.
+   A media query não percebe isso (ela mede a tela, não a fonte); a rolagem,
+   sim. */
+.tabela-rolagem{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;   /* rolagem com inércia no iOS */
+  scrollbar-width:thin;               /* barra discreta no Firefox */
+}
+/* Barra de rolagem discreta, na cor do tema (Chrome, Edge, Safari). */
+.tabela-rolagem::-webkit-scrollbar{height:8px}
+.tabela-rolagem::-webkit-scrollbar-thumb{background:var(--line);border-radius:var(--pill)}
+.tabela-rolagem::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+
+/* `border-collapse` junta as bordas das células numa linha só, em vez de
+   deixar duas bordas grudadas com folga entre elas. */
+table{width:100%;border-collapse:collapse}
+
+th{
+  text-align:left;font-weight:500;font-size:.8rem;color:var(--muted);
+  padding:.8rem .9rem;background:var(--page);border-bottom:1px solid var(--line);
+}
+td{padding:.78rem .9rem;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr{transition:background .15s ease}
+tbody tr:hover{background:var(--page)}      /* destaca a linha sob o mouse */
+tbody tr:last-child td{border-bottom:none}  /* a última linha não precisa de traço */
+
+.r{text-align:right}                        /* colunas de número, alinhadas à direita */
+.sub{color:var(--faint);font-size:.85rem}   /* informação secundária */
+
+/* --- DESTAQUE DE ESTOQUE BAIXO ---
+   Esta é a CONSULTA 1 do trabalho aparecendo na tela: o JavaScript põe a
+   classe "baixo" na linha quando estoque_atual < estoque_minimo. */
+tr.baixo{background:var(--alert-soft)}
+tr.baixo:hover{filter:brightness(0.97)}
+tr.baixo .saldo{color:var(--alert);font-weight:600}
+
+/* A etiqueta escrita "abaixo do mínimo".
+   IMPORTANTE PARA ACESSIBILIDADE: não basta pintar a linha de vermelho,
+   porque quem não distingue cores não perceberia o alerta. O texto garante
+   que a informação chegue a todo mundo. */
+.flag{
+  display:inline-block;margin-left:.45rem;font-size:.7rem;font-weight:600;color:#fff;
+  background:var(--alert);border-radius:var(--pill);padding:.18rem .65rem;vertical-align:1px;
+}
+
+
+/* ==========================================================================
+   7. PÍLULAS DE CATEGORIA E LEGENDA
+   --------------------------------------------------------------------------
+   Cada categoria ganha uma cor. O JavaScript escolhe a classe (chip-azul,
+   chip-verde...) conforme a categoria do produto.
+   ========================================================================== */
+.chip{
+  display:inline-block;padding:.15rem .6rem;border-radius:var(--pill);
+  font-size:.78rem;font-weight:500;border:1px solid transparent;
+}
+.chip-azul{background:var(--azul-soft);color:var(--azul)}
+.chip-azulclaro{background:var(--azulclaro-soft);color:var(--azulclaro)}
+.chip-rosa{background:var(--rosa-soft);color:var(--rosa)}
+.chip-verde{background:var(--verde-soft);color:var(--verde)}
+
+/* --- coluna de ações (Entrada, Saída, Editar, Desativar) ---
+   `white-space:nowrap` impede que os botões quebrem para a linha de baixo. */
+.acoes{white-space:nowrap;text-align:right}
+.acoes button{
+  padding:.4rem .55rem;margin-left:2px;font-size:.78rem;line-height:1;
+  border-color:transparent;background:transparent;color:var(--muted);
+  border-radius:var(--radius-sm);
+}
+.acoes button:hover{background:var(--accent-soft);border-color:var(--line);color:var(--accent)}
+
+/* A ação destrutiva (Desativar) fica vermelha só no hover: discreta em
+   repouso, mas avisa antes do clique. */
+.acoes button.dan:hover{background:var(--alert-soft);color:var(--alert)}
+
+/* --- rodapé da tabela: os totais ---
+   É a CONSULTA 2 do trabalho (valor imobilizado) aparecendo na tela. */
+.totais{
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:.6rem;
+  padding:.78rem .9rem;background:var(--page);border-top:1px solid var(--line);
+  font-size:.85rem;color:var(--muted);
+}
+.totais strong{color:var(--ink);font-weight:600}
+
+/* --- legenda de cores ---
+   Explica o que cada cor significa. Sem ela, as pílulas coloridas seriam
+   decoração; com ela, viram informação. */
+.legenda{
+  display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;
+  margin-top:.8rem;padding:.6rem .9rem;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font-size:.78rem;color:var(--muted);background:var(--surface);
+}
+.legenda .titulo-legenda{font-weight:600;color:var(--ink);margin-right:.2rem}
+.legenda .item{display:flex;align-items:center;gap:.4rem}
+.legenda .ponto{width:.6rem;height:.6rem;border-radius:50%;flex-shrink:0}
+.legenda .ponto.azul{background:var(--azul)}
+.legenda .ponto.azulclaro{background:var(--azulclaro)}
+.legenda .ponto.rosa{background:var(--rosa)}
+.legenda .ponto.verde{background:var(--verde)}
+.legenda .ponto.alerta{background:var(--alert)}
+
+
+/* ==========================================================================
+   8. PAINEL DE FORMULÁRIO
+   --------------------------------------------------------------------------
+   É UM painel só, que troca de título e de campos conforme a ação clicada
+   (novo, editar, entrada, saída, desativar).
+
+   POR QUE UM PAINEL EMBAIXO E NÃO UMA JANELA FLUTUANTE (modal)?
+   Modal exige fundo escurecido, z-index, travar o scroll e devolver o foco
+   ao fechar. O painel resolve a mesma necessidade sem nada disso.
+   ========================================================================== */
+.painel{
+  margin-top:1.1rem;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.3rem 1.4rem 1.4rem;box-shadow:var(--shadow);
+  animation:surgir .22s ease both;
+}
+
+/* O atributo `hidden` do HTML é o que esconde o painel. O JavaScript
+   apenas liga/desliga esse atributo — não mexe em estilo. */
+.painel[hidden]{display:none}
+
+.painel-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem}
+.painel-topo h2{margin:0;font-family:"Fraunces",serif;font-size:1.15rem;font-weight:600}
+.painel-topo button{                 /* o "×" de fechar, redondo */
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);
+  width:1.9rem;height:1.9rem;padding:0;border-radius:50%;font-size:1rem;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.painel-topo button:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-soft)}
+
+/* Faixa que lembra QUAL produto está sendo editado e seu estoque atual.
+   Como a ação partiu do botão dentro da linha, o produto já está escolhido —
+   por isso nenhum formulário precisa de caixa de seleção de produto. */
+.contexto{
+  background:var(--accent-soft);border-radius:var(--radius-sm);
+  padding:.65rem .85rem;margin:.8rem 0 1.1rem;font-size:.85rem;color:var(--accent);
+}
+
+/* --- grades de campos ---
+   `auto-fit` + `minmax` = colunas que se reorganizam sozinhas: cabem lado a
+   lado quando há espaço e empilham quando não há. Responsivo sem media query. */
+.grid{display:grid;gap:.85rem;margin-bottom:1rem}
+.g2{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}  /* 2 colunas */
+.g3{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}  /* 3 colunas */
+
+/* Regra geral do atributo `hidden`. O `!important` é necessário porque
+   `display:grid` (acima) venceria o `display:none` padrão do hidden. */
+[hidden]{display:none !important}
+
+label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.3rem}
+.dica{font-size:.78rem;color:var(--faint);margin-top:.35rem}
+
+/* Mensagem de erro. Recebe o texto que o BANCO devolveu — por exemplo
+   "Saldo insuficiente para a saída solicitada.", que vem do THROW da
+   procedure. A animação "balancar" chama a atenção para ela. */
+.erro{
+  color:var(--alert);font-size:.85rem;margin:0 0 .8rem;padding:.6rem .8rem;
+  background:var(--alert-soft);border-radius:var(--radius-sm);
+  animation:balancar .3s ease;
+}
+.erro[hidden]{display:none}
+
+.rodape-painel{display:flex;justify-content:flex-end;gap:.55rem;padding-top:1rem;border-top:1px solid var(--line)}
+.nota{font-size:.78rem;color:var(--faint);margin:1.2rem .25rem 0;padding-top:.9rem;border-top:1px dashed var(--line)}
+
+/* Aviso mostrado quando NENHUM formulário está aberto. A borda tracejada
+   comunica "aqui vai aparecer conteúdo", diferente de um cartão de verdade. */
+.vazio{
+  margin-top:1.1rem;padding:1.1rem 1.2rem;border:1.5px dashed var(--line);border-radius:var(--radius);
+  color:var(--faint);font-size:.85rem;text-align:center;
+}
+.vazio[hidden]{display:none}
+
+
+/* ==========================================================================
+   9. ANIMAÇÕES
+   ========================================================================== */
+
+/* Painel entrando: aparece subindo alguns pixels. Dá a noção de que ele
+   surgiu ali, em vez de piscar do nada. */
+@keyframes surgir{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* Erro: um tremor curto na horizontal, o gesto universal de "não". */
+@keyframes balancar{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+/* ACESSIBILIDADE: há pessoas que sentem enjoo ou desconforto com animações
+   (vertigem, enxaqueca vestibular) e configuram o sistema para reduzi-las.
+   Esta media query respeita essa escolha, praticamente zerando as durações
+   sem quebrar nada — os elementos continuam aparecendo, só que sem o movimento. */
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s !important;transition-duration:.001s !important}
+}
+
+
+/* ==========================================================================
+   10. RESPONSIVO — a tela em três tamanhos
+   --------------------------------------------------------------------------
+   O PROBLEMA QUE ESTA SEÇÃO RESOLVE
+   Uma tabela de 7 colunas tem uma largura MÍNIMA: abaixo dela, ou o texto
+   vira sopa de letrinhas, ou o excesso é cortado. A coluna "Ações" é a pior
+   de todas, porque são quatro botões lado a lado que não podem quebrar.
+
+   Antes, a tabela só virava cartão em 640px. Entre 641px e o desktop ela
+   continuava sendo tabela num espaço em que já não cabia — e os botões de
+   ação ficavam cortados pela direita, sem jeito de alcançar.
+
+   A SOLUÇÃO, EM TRÊS DEGRAUS (do maior para o menor):
+
+     10.1  até 1100px  ->  a tabela APERTA (menos respiro, botões menores)
+     10.2  até  900px  ->  a tabela VIRA CARTÃO (é onde ela deixa de caber)
+     10.3  até  640px  ->  o resto da página vira LAYOUT DE CELULAR
+
+   Os degraus se somam: numa tela de 500px valem os três. Por isso cada um
+   só escreve o que muda em relação ao anterior.
+
+   E, por baixo dos três, a .tabela-rolagem (seção 6) garante que NADA seja
+   cortado, mesmo numa combinação de tamanhos que ninguém previu.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   10.1 — ATÉ 1100px: a tabela aperta em vez de estourar
+   Ainda cabe como tabela, mas está no limite. Reduzir o respiro interno e o
+   tamanho dos botões devolve uns 120px de largura útil — o suficiente para
+   a tabela continuar inteira em notebooks e tablets deitados, sem rolagem.
+   -------------------------------------------------------------------------- */
+@media (max-width:1100px){
+  th,td{padding-left:.55rem;padding-right:.55rem}
+
+  /* Os botões de ação perdem o excesso de folga, não a legibilidade:
+     o texto continua lá, só o espaço em volta encolhe. */
+  .acoes button{padding:.38rem .42rem;margin-left:1px;font-size:.74rem}
+
+  /* A etiqueta "abaixo do mínimo" é a maior de todas dentro da coluna
+     Produto. Encolhê-la um pouco tira pressão da linha inteira. */
+  .flag{font-size:.66rem;padding:.16rem .5rem;margin-left:.35rem}
+
+  .legenda{gap:.7rem;font-size:.78rem}
+}
+
+
+/* --------------------------------------------------------------------------
+   10.2 — ATÉ 900px: a tabela vira LISTA DE CARTÕES
+   --------------------------------------------------------------------------
+   ESTE É O DEGRAU PRINCIPAL. 900px é o ponto em que a tabela deixa de caber
+   de verdade: as 6 colunas de dados pedem ~700px e os 4 botões pedem ~250px.
+   Não é questão de apertar mais — não cabe.
+
+   Em vez de cortar ou obrigar a rolar para o lado, cada produto vira um
+   CARTÃO que ocupa a largura toda, com as informações empilhadas.
+
+   Repare que este degrau começa bem antes do celular: um tablet em pé
+   (768px) e uma janela de navegador pela metade num monitor grande também
+   caem aqui — e é exatamente onde o corte acontecia antes.
+   -------------------------------------------------------------------------- */
+@media (max-width:900px){
+  /* Em modo cartão nada mais transborda, então a caixa de rolagem sai de
+     cena — senão sobraria uma barra horizontal inútil. */
+  .tabela-rolagem{overflow-x:visible}
+
+  /* Trocar o `display` das tags de tabela desliga o comportamento de grade e
+     faz cada <tr> se comportar como um bloco comum. */
+  thead{display:none}                    /* sem colunas, o cabeçalho perde a função */
+  table,tbody,tr,td{display:block;width:100%}
+  tbody tr{
+    padding:.95rem 1rem;margin-bottom:.7rem;
+    border:1px solid var(--line);border-radius:var(--radius-sm);
+    background:var(--surface);
+  }
+  tbody tr:last-child{margin-bottom:0}
+  tbody tr:hover{background:var(--surface)}  /* sem linha, o realce de linha não faz sentido */
+  tr.baixo{border-color:var(--alert)}    /* alerta vira a borda do cartão */
+  tr.baixo,tr.baixo:hover{background:var(--alert-soft)}
+
+  td{border:none;padding:.28rem 0;text-align:left}
+  td.r{text-align:left}                  /* sem colunas, alinhar à direita perde sentido */
+
+  /* SEM O CABEÇALHO, COMO SABER O QUE É CADA NÚMERO?
+     Cada <td> no HTML tem data-label="Categoria", data-label="Estoque"...
+     O `content:attr(data-label)` lê esse atributo e o imprime como rótulo.
+     Resultado: "Estoque      12" dentro do cartão. */
+  td[data-label]{display:flex;justify-content:space-between;align-items:center;gap:.8rem}
+  td[data-label]::before{
+    content:attr(data-label);font-size:.72rem;color:var(--faint);font-weight:500;flex-shrink:0;
+  }
+
+  /* O nome do produto (primeira célula) vira o TÍTULO do cartão: sem rótulo,
+     em destaque e separado do resto por um traço. */
+  td:first-child{
+    font-weight:500;padding-bottom:.55rem;margin-bottom:.35rem;
+    border-bottom:1px dashed var(--line);
+  }
+  td:first-child .flag{display:block;width:fit-content;margin:.4rem 0 0}
+
+  /* A célula de ações também perde o `nowrap` herdado da tabela: agora os
+     botões PODEM (e devem) quebrar em várias linhas. */
+  td.acoes{padding-top:.6rem}
+  td.acoes::before{display:none}         /* este não precisa de rótulo */
+
+  /* OS BOTÕES EM GRADE, NÃO EM FLEX.
+     `repeat(auto-fit, minmax(8.5rem, 1fr))` significa: "faça quantas colunas
+     de no mínimo 8.5rem couberem, e distribua a sobra igualmente entre elas".
+     O `auto-fit` descarta as colunas que sobrarem vazias, então os quatro
+     botões sempre terminam com a mesma largura, preenchendo a linha.
+
+     POR QUE GRADE E NÃO FLEX AQUI: com flex seria preciso calcular a largura
+     descontando o vão (`calc(50% - .25rem)`), e essa conta bate EXATAMENTE no
+     limite da linha — qualquer arredondamento de meio pixel empurra o último
+     botão para a linha de baixo. A grade já reserva o vão por conta própria;
+     não há conta para errar.
+
+     ATENÇÃO AO SELETOR: aqui é `td.acoes`, não `.acoes`.
+     A regra `td[data-label]` acima vale (0,1,1) de especificidade — elemento
+     + atributo — e a célula de ações também tem data-label="Ações", então ela
+     casa nas duas. Um seletor `.acoes` sozinho vale só (0,1,0) e PERDE: o
+     `display:flex` e o `gap:.8rem` de lá continuariam valendo, e a grade
+     nunca entraria em vigor. `td.acoes` empata em (0,1,1) e ganha por vir
+     depois no arquivo. */
+  td.acoes{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));
+    gap:.5rem;text-align:left;white-space:normal;
+  }
+
+  /* `min-height:2.7rem` segue a recomendação de alvo mínimo de toque: um
+     botão pequeno demais é impossível de acertar com o dedo. */
+  .acoes button{
+    min-height:2.7rem;font-size:.82rem;
+    padding:.4rem .7rem;margin-left:0;
+    border-width:1.5px;border-color:var(--faint);
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   10.3 — ATÉ 640px: o resto da página vira layout de celular
+   A tabela já virou cartão no degrau anterior. Aqui muda a MOLDURA: margens
+   menores, cabeçalho empilhado e botões de largura total.
+   -------------------------------------------------------------------------- */
+@media (max-width:640px){
+  .wrap{padding:1.6rem 1rem 3rem}
+  header{align-items:flex-start}
+  .acessibilidade{width:100%;justify-content:space-between}
+  .acessibilidade button{padding:.55rem .8rem}  /* alvo maior para o dedo */
+
+  .toolbar{flex-direction:column;align-items:stretch}
+  .toolbar .grow{min-width:0}
+  #btn-novo{width:100%;min-height:2.9rem}
+
+  /* No celular, DOIS botões por linha, fixo.
+     Deixar a grade decidir sozinha daria três numa linha e um sozinho na
+     outra — feio e desequilibrado. Duas colunas iguais dão alvos largos para
+     o dedo e uma leitura previsível: entrada/saída em cima, editar/desativar
+     embaixo, sempre na mesma posição em todos os cartões. */
+  td.acoes{grid-template-columns:1fr 1fr}
+
+  /* Botões do formulário empilhados e largos.
+     `column-reverse` coloca a ação PRINCIPAL em cima — mais perto do polegar
+     e na ordem em que se espera tocar. */
+  .rodape-painel{flex-direction:column-reverse;gap:.6rem}
+  .rodape-painel button{width:100%;min-height:2.8rem}
+}
