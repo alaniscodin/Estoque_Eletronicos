@@ -1,6 +1,8 @@
 # Estoque de Eletrônicos — MiauStore
 ### Trabalho de SQL · versão **teste**
 
+<img width="1484" height="632" alt="image" src="https://github.com/user-attachments/assets/2ea48318-ba00-4749-8f7a-23acbf32a599" />
+
 Sistema de controle de estoque com banco **SQL Server**, back-end em **Python
 puro** (sem framework) e front-end em **HTML/CSS/JavaScript**.
 
